@@ -21,3 +21,49 @@ rad.json
 *.flf
 #Test results file
 TestResults.xml
+
+# -----------------------------
+# Python artifacts (rebuildable)
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging/build outputs
+build/
+dist/
+*.egg
+
+# -----------------------------
+# Node.js artifacts (reinstallable)
+# -----------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Frontend build outputs
+apps/portal-web/dist/
+
+# -----------------------------
+# Runtime/local generated files
+# -----------------------------
+*.db
+docker-up.log

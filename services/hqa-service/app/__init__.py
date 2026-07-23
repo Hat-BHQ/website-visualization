@@ -1,0 +1,1 @@
+"""HQ Portal HQA service."""

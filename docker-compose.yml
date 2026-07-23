@@ -1,0 +1,215 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hq-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-hq_portal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hq_portal_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hq_portal} -d ${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+  redis:
+    image: redis:7-alpine
+    container_name: hq-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+    container_name: hq-auth-service
+    restart: unless-stopped
+    environment:
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/auth_db}
+      DATABASE_URL: ${AUTH_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/auth_db}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-access-secret}
+      JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY:-change-me-refresh-secret}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-30}
+      SEED_DEFAULT_PASSWORD: ${SEED_DEFAULT_PASSWORD:-change-me-password}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      TZ: ${TZ:-Asia/Bangkok}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/ready', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "${AUTH_SERVICE_PORT:-8001}:8000"
+
+  hqa-service:
+    build:
+      context: ./services/hqa-service
+    container_name: hq-hqa-service
+    restart: unless-stopped
+    environment:
+      HQA_DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
+      DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:8000}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-access-secret}
+      CELERY_TIMEZONE: ${CELERY_TIMEZONE:-Asia/Bangkok}
+      GOOGLE_SPREADSHEET_ID: ${GOOGLE_SPREADSHEET_ID:-}
+      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-/run/secrets/google-service-account.json}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      TZ: ${TZ:-Asia/Bangkok}
+    volumes:
+      - ./secrets:/run/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "${HQA_SERVICE_PORT:-8002}:8000"
+
+  hqa-worker:
+    build:
+      context: ./services/hqa-service
+    container_name: hq-hqa-worker
+    restart: unless-stopped
+    command: ["celery", "-A", "app.worker.celery_app:celery_app", "worker", "--loglevel=INFO"]
+    environment:
+      HQA_DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
+      DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-access-secret}
+      CELERY_TIMEZONE: ${CELERY_TIMEZONE:-Asia/Bangkok}
+      GOOGLE_SPREADSHEET_ID: ${GOOGLE_SPREADSHEET_ID:-}
+      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-/run/secrets/google-service-account.json}
+      TZ: ${TZ:-Asia/Bangkok}
+    volumes:
+      - ./secrets:/run/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      hqa-service:
+        condition: service_healthy
+
+  hqa-beat:
+    build:
+      context: ./services/hqa-service
+    container_name: hq-hqa-beat
+    restart: unless-stopped
+    command: ["celery", "-A", "app.worker.celery_app:celery_app", "beat", "--loglevel=INFO"]
+    environment:
+      HQA_DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
+      DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-access-secret}
+      CELERY_TIMEZONE: ${CELERY_TIMEZONE:-Asia/Bangkok}
+      GOOGLE_SPREADSHEET_ID: ${GOOGLE_SPREADSHEET_ID:-}
+      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-/run/secrets/google-service-account.json}
+      TZ: ${TZ:-Asia/Bangkok}
+    volumes:
+      - ./secrets:/run/secrets:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      hqa-worker:
+        condition: service_started
+
+  hqs-service:
+    build:
+      context: ./services/hqs-service
+    container_name: hq-hqs-service
+    restart: unless-stopped
+    environment:
+      HQS_DATABASE_URL: ${HQS_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqs_db}
+      DATABASE_URL: ${HQS_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqs_db}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-access-secret}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      TZ: ${TZ:-Asia/Bangkok}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "${HQS_SERVICE_PORT:-8003}:8000"
+
+  portal-web:
+    build:
+      context: ./apps/portal-web
+    container_name: hq-portal-web
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -c
+      - npm run build && rm -rf /portal-dist/* && cp -r dist/* /portal-dist/ && tail -f /dev/null
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/}
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      hqa-service:
+        condition: service_healthy
+      hqs-service:
+        condition: service_healthy
+    volumes:
+      - portal-web-dist:/portal-dist
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /portal-dist/index.html"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: hq-nginx
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      hqa-service:
+        condition: service_healthy
+      hqs-service:
+        condition: service_healthy
+      portal-web:
+        condition: service_healthy
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - portal-web-dist:/usr/share/nginx/html:ro
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  postgres-data:
+  redis-data:
+  portal-web-dist:
