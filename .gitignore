@@ -67,3 +67,4 @@ apps/portal-web/dist/
 # -----------------------------
 *.db
 docker-up.log
+.env
