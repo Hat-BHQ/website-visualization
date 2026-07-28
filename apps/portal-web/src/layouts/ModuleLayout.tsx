@@ -9,7 +9,7 @@ export function ModuleLayout({ moduleCode, user, title, subtitle, children }: { 
       <Sidebar moduleCode={moduleCode} user={user} />
       <div className="content-shell">
         <Topbar title={title} subtitle={subtitle} />
-        <main className="content-body">{children}</main>
+        <main className="content-body w-full">{children}</main>
       </div>
     </div>
   );
