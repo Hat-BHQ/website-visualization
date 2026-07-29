@@ -103,18 +103,55 @@ export interface BatchSyncTriggerResponse {
   items: SyncTriggerResponse[];
 }
 
+export type ListingSortBy =
+  | 'last_seen_at'
+  | 'published_at'
+  | 'status'
+  | 'category'
+  | 'condition'
+  | 'seller'
+  | 'price';
+
+export type ListingSortOrder = 'asc' | 'desc';
+
 export interface ListingListParams {
   page: number;
   page_size: number;
+
   q?: string;
-  status?: string;
-  category?: string;
-  condition?: string;
-  seller?: string;
+
+  status?: string[];
+  category?: string[];
+  condition?: string[];
+  seller?: string[];
+  currency?: string[];
+
   min_price?: string;
   max_price?: string;
+
   date_from?: string;
   date_to?: string;
-  sort_by?: string;
-  sort_order?: 'asc' | 'desc';
+
+  sort_by?: ListingSortBy;
+  sort_order?: ListingSortOrder;
+}
+
+export interface ListingFacetOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface ListingPriceRange {
+  min: string | null;
+  max: string | null;
+}
+
+export interface ListingFilterOptions {
+  status: ListingFacetOption[];
+  category: ListingFacetOption[];
+  condition: ListingFacetOption[];
+  seller: ListingFacetOption[];
+  currency: ListingFacetOption[];
+  price_range: ListingPriceRange;
 }

@@ -3,8 +3,65 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
-
 from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+ListingSortBy = Literal[
+    "last_seen_at",
+    "published_at",
+    "status",
+    "category",
+    "condition",
+    "seller",
+    "price",
+]
+
+ListingSortOrder = Literal["asc", "desc"]
+
+
+class ListingListRequest(BaseModel):
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=30, ge=1, le=100)
+
+    q: str | None = None
+
+    status: list[str] | None = None
+    category: list[str] | None = None
+    condition: list[str] | None = None
+    seller: list[str] | None = None
+    currency: list[str] | None = None
+
+    product_id: str | None = None
+    keyword: str | None = None
+
+    min_price: Decimal | None = None
+    max_price: Decimal | None = None
+
+    date_from: date | None = None
+    date_to: date | None = None
+
+    sort_by: ListingSortBy = "last_seen_at"
+    sort_order: ListingSortOrder = "desc"
+
+
+class ListingFacetOption(BaseModel):
+    value: str
+    label: str
+    count: int
+
+
+class ListingPriceRange(BaseModel):
+    min: Decimal | None = None
+    max: Decimal | None = None
+
+
+class ListingFilterOptionsResponse(BaseModel):
+    status: list[ListingFacetOption]
+    category: list[ListingFacetOption]
+    condition: list[ListingFacetOption]
+    seller: list[ListingFacetOption]
+    currency: list[ListingFacetOption]
+    price_range: ListingPriceRange
 
 
 class ListingListRequest(BaseModel):

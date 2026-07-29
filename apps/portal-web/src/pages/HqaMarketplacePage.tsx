@@ -4,10 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 
 import { isForbiddenError } from '@/api/errors';
 import {
+  getMarketplaceFilterOptions,
   getMarketplaceListingDetail,
   getMarketplaceListingHistory,
   getMarketplaceListings,
 } from '@/api/hqa';
+
+import {
+  FacetMultiSelect,
+} from '@/components/FacetMultiSelect';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingScreen } from '@/components/LoadingScreen';
@@ -19,6 +24,13 @@ import type { ListingListParams, Marketplace } from '@/types/hqa';
 const defaultFilters: ListingListParams = {
   page: 1,
   page_size: 20,
+
+  status: [],
+  category: [],
+  condition: [],
+  seller: [],
+  currency: [],
+
   sort_by: 'last_seen_at',
   sort_order: 'desc',
 };
@@ -60,6 +72,21 @@ export function HqaMarketplacePage({
   const listingsQuery = useQuery({
     queryKey: ['hqa', 'listings', marketplace, filters],
     queryFn: () => getMarketplaceListings(marketplace, filters),
+  });
+
+  const filterOptionsQuery = useQuery({
+    queryKey: [
+      'hqa',
+      'listing-filter-options',
+      marketplace,
+      filters,
+    ],
+    queryFn: () =>
+      getMarketplaceFilterOptions(
+        marketplace,
+        filters,
+      ),
+    staleTime: 60_000,
   });
 
   const listingDetailQuery = useQuery({
@@ -111,29 +138,123 @@ export function HqaMarketplacePage({
             <span className="field-label">Từ khóa</span>
             <input value={form.q ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, q: event.target.value || undefined }))} placeholder="Tên listing" />
           </label>
+          <FacetMultiSelect
+            label="Status"
+            value={form.status ?? []}
+            options={
+              filterOptionsQuery.data?.status ?? []
+            }
+            searchable={false}
+            onApply={(values) =>
+              setForm((prev) => ({
+                ...prev,
+                status: values,
+              }))
+            }
+          />
+
+          <FacetMultiSelect
+            label="Category"
+            value={form.category ?? []}
+            options={
+              filterOptionsQuery.data?.category ?? []
+            }
+            onApply={(values) =>
+              setForm((prev) => ({
+                ...prev,
+                category: values,
+              }))
+            }
+          />
+
+          <FacetMultiSelect
+            label="Condition"
+            value={form.condition ?? []}
+            options={
+              filterOptionsQuery.data?.condition ?? []
+            }
+            onApply={(values) =>
+              setForm((prev) => ({
+                ...prev,
+                condition: values,
+              }))
+            }
+          />
+
+          <FacetMultiSelect
+            label="Seller"
+            value={form.seller ?? []}
+            options={
+              filterOptionsQuery.data?.seller ?? []
+            }
+            onApply={(values) =>
+              setForm((prev) => ({
+                ...prev,
+                seller: values,
+              }))
+            }
+          />
+
+          <FacetMultiSelect
+            label="Currency"
+            value={form.currency ?? []}
+            options={
+              filterOptionsQuery.data?.currency ?? []
+            }
+            searchable={false}
+            onApply={(values) =>
+              setForm((prev) => ({
+                ...prev,
+                currency: values,
+              }))
+            }
+          />
           <label className="field-stack">
-            <span className="field-label">Status</span>
-            <input value={form.status ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value || undefined }))} placeholder="active" />
+            <span className="field-label">
+              Min price
+            </span>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.min_price ?? ''}
+              placeholder={
+                filterOptionsQuery.data
+                  ?.price_range.min ?? '0'
+              }
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  min_price:
+                    event.target.value || undefined,
+                }))
+              }
+            />
           </label>
+
           <label className="field-stack">
-            <span className="field-label">Category</span>
-            <input value={form.category ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value || undefined }))} placeholder="Synths" />
-          </label>
-          <label className="field-stack">
-            <span className="field-label">Condition</span>
-            <input value={form.condition ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, condition: event.target.value || undefined }))} placeholder="Used" />
-          </label>
-          <label className="field-stack">
-            <span className="field-label">Seller</span>
-            <input value={form.seller ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, seller: event.target.value || undefined }))} placeholder="Shop" />
-          </label>
-          <label className="field-stack">
-            <span className="field-label">Min price</span>
-            <input value={form.min_price ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, min_price: event.target.value || undefined }))} placeholder="0" />
-          </label>
-          <label className="field-stack">
-            <span className="field-label">Max price</span>
-            <input value={form.max_price ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, max_price: event.target.value || undefined }))} placeholder="500" />
+            <span className="field-label">
+              Max price
+            </span>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.max_price ?? ''}
+              placeholder={
+                filterOptionsQuery.data
+                  ?.price_range.max ?? '500'
+              }
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  max_price:
+                    event.target.value || undefined,
+                }))
+              }
+            />
           </label>
           <label className="field-stack">
             <span className="field-label">Date from</span>
@@ -153,14 +274,54 @@ export function HqaMarketplacePage({
             </select>
           </label>
           <label className="field-stack">
-            <span className="field-label">Sort by</span>
-            <input value={form.sort_by ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, sort_by: event.target.value || undefined }))} placeholder="last_seen_at" />
+            <span className="field-label">
+              Sort by
+            </span>
+
+            <select
+              value={form.sort_by ?? 'last_seen_at'}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  sort_by:
+                    event.target.value as ListingListParams['sort_by'],
+                }))
+              }
+            >
+              <option value="last_seen_at">
+                Last updated
+              </option>
+
+              <option value="published_at">
+                Published date
+              </option>
+
+              <option value="status">
+                Status
+              </option>
+
+              <option value="category">
+                Category
+              </option>
+
+              <option value="condition">
+                Condition
+              </option>
+
+              <option value="seller">
+                Seller
+              </option>
+
+              <option value="price">
+                Price
+              </option>
+            </select>
           </label>
           <label className="field-stack">
             <span className="field-label">Sort order</span>
             <select value={form.sort_order ?? 'desc'} onChange={(event) => setForm((prev) => ({ ...prev, sort_order: event.target.value as 'asc' | 'desc' }))}>
-              <option value="desc">desc</option>
-              <option value="asc">asc</option>
+              <option value="desc">Giảm dần</option>
+              <option value="asc"> Tăng dần</option>
             </select>
           </label>
         </div>
@@ -170,7 +331,59 @@ export function HqaMarketplacePage({
           <button className="action-button secondary" type="button" onClick={resetFilters}>Reset filter</button>
         </div>
       </section>
+      <div className="active-filters">
+        {(filters.status ?? []).map((value) => (
+          <button
+            key={`status-${value}`}
+            type="button"
+            onClick={() => {
+              const nextValues =
+                (filters.status ?? []).filter(
+                  (item) => item !== value,
+                );
 
+              setFilters((prev) => ({
+                ...prev,
+                status: nextValues,
+                page: 1,
+              }));
+
+              setForm((prev) => ({
+                ...prev,
+                status: nextValues,
+              }));
+            }}
+          >
+            Status: {value} ×
+          </button>
+        ))}
+
+        {(filters.category ?? []).map((value) => (
+          <button
+            key={`category-${value}`}
+            type="button"
+            onClick={() => {
+              const nextValues =
+                (filters.category ?? []).filter(
+                  (item) => item !== value,
+                );
+
+              setFilters((prev) => ({
+                ...prev,
+                category: nextValues,
+                page: 1,
+              }));
+
+              setForm((prev) => ({
+                ...prev,
+                category: nextValues,
+              }));
+            }}
+          >
+            Category: {value} ×
+          </button>
+        ))}
+      </div>
       {listingsQuery.isLoading ? <LoadingScreen label="Đang tải listings..." /> : null}
 
       {listingsQuery.isError ? (
@@ -186,7 +399,7 @@ export function HqaMarketplacePage({
       ) : null}
 
       {!listingsQuery.isLoading && !listingsQuery.isError && listingItems.length > 0 ? (
-        <section className="surface" style={{ padding: '1rem', borderRadius: '18px', overflow: 'auto' }}>
+        <section className="" style={{ padding: '1rem', borderRadius: '18px', overflow: 'auto', background: '#fff', boxShadow: '0 24px 60px rgba(15, 23, 42, 0.12)', }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
             <thead>
               <tr>
@@ -218,7 +431,7 @@ export function HqaMarketplacePage({
             </tbody>
           </table>
 
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             {pageItems.map((page) => (
               <button
                 key={page}
@@ -240,70 +453,73 @@ export function HqaMarketplacePage({
             ))}
           </div>
         </section>
-      ) : null}
+      ) : null
+      }
 
-      {selectedListingId ? (
-        <section className="module-card" style={{ marginTop: '1rem' }}>
-          <h3 style={{ marginTop: 0 }}>Listing detail</h3>
-          {listingDetailQuery.isLoading ? <LoadingScreen label="Đang tải chi tiết listing..." /> : null}
-          {listingDetailQuery.isError ? (
-            <ErrorState title="Không thể tải chi tiết" message="Vui lòng thử lại." action={<button className="action-button" type="button" onClick={() => void listingDetailQuery.refetch()}>Thử lại</button>} />
-          ) : null}
-          {listingDetailQuery.data ? (
-            <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-              <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
-                <strong>Title</strong>
-                <div style={{ color: 'var(--muted)', marginTop: '0.35rem' }}>{listingDetailQuery.data.listing_title}</div>
+      {
+        selectedListingId ? (
+          <section className="module-card" style={{ marginTop: '1rem' }}>
+            <h3 style={{ marginTop: 0 }}>Listing detail</h3>
+            {listingDetailQuery.isLoading ? <LoadingScreen label="Đang tải chi tiết listing..." /> : null}
+            {listingDetailQuery.isError ? (
+              <ErrorState title="Không thể tải chi tiết" message="Vui lòng thử lại." action={<button className="action-button" type="button" onClick={() => void listingDetailQuery.refetch()}>Thử lại</button>} />
+            ) : null}
+            {listingDetailQuery.data ? (
+              <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
+                  <strong>Title</strong>
+                  <div style={{ color: 'var(--muted)', marginTop: '0.35rem' }}>{listingDetailQuery.data.listing_title}</div>
+                </div>
+                <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
+                  <strong>Listing URL</strong>
+                  <div style={{ marginTop: '0.35rem' }}><a href={listingDetailQuery.data.listing_url} target="_blank" rel="noreferrer">{listingDetailQuery.data.listing_url}</a></div>
+                </div>
+                <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
+                  <strong>Last updated</strong>
+                  <div style={{ color: 'var(--muted)', marginTop: '0.35rem' }}>{formatDateTime(listingDetailQuery.data.last_seen_at)}</div>
+                </div>
+                <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
+                  <strong>State hash</strong>
+                  <div style={{ color: 'var(--muted)', marginTop: '0.35rem' }}>{listingDetailQuery.data.state_hash ?? 'N/A'}</div>
+                </div>
               </div>
-              <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
-                <strong>Listing URL</strong>
-                <div style={{ marginTop: '0.35rem' }}><a href={listingDetailQuery.data.listing_url} target="_blank" rel="noreferrer">{listingDetailQuery.data.listing_url}</a></div>
-              </div>
-              <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
-                <strong>Last updated</strong>
-                <div style={{ color: 'var(--muted)', marginTop: '0.35rem' }}>{formatDateTime(listingDetailQuery.data.last_seen_at)}</div>
-              </div>
-              <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
-                <strong>State hash</strong>
-                <div style={{ color: 'var(--muted)', marginTop: '0.35rem' }}>{listingDetailQuery.data.state_hash ?? 'N/A'}</div>
-              </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          <h4 style={{ marginTop: '1.25rem', marginBottom: '0.75rem' }}>History</h4>
-          {listingHistoryQuery.isLoading ? <LoadingScreen label="Đang tải history..." /> : null}
-          {listingHistoryQuery.isError ? (
-            <ErrorState title="Không thể tải lịch sử" message="Vui lòng thử lại." action={<button className="action-button" type="button" onClick={() => void listingHistoryQuery.refetch()}>Thử lại</button>} />
-          ) : null}
-          {listingHistoryQuery.data && listingHistoryQuery.data.length === 0 ? (
-            <EmptyState title="Không có lịch sử" message="Listing này chưa có bản ghi snapshot." />
-          ) : null}
-          {listingHistoryQuery.data && listingHistoryQuery.data.length > 0 ? (
-            <div className="surface" style={{ borderRadius: '14px', overflow: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '760px' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '0.6rem' }}>Observed at</th>
-                    <th style={{ textAlign: 'left', padding: '0.6rem' }}>Price</th>
-                    <th style={{ textAlign: 'left', padding: '0.6rem' }}>Status</th>
-                    <th style={{ textAlign: 'left', padding: '0.6rem' }}>State hash</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {listingHistoryQuery.data.map((item) => (
-                    <tr key={item.id} style={{ borderTop: '1px solid var(--border)' }}>
-                      <td style={{ padding: '0.65rem' }}>{formatDateTime(item.observed_at)}</td>
-                      <td style={{ padding: '0.65rem' }}>{item.price ?? 'N/A'}</td>
-                      <td style={{ padding: '0.65rem' }}>{item.listing_status ?? 'N/A'}</td>
-                      <td style={{ padding: '0.65rem' }}>{item.state_hash}</td>
+            <h4 style={{ marginTop: '1.25rem', marginBottom: '0.75rem' }}>History</h4>
+            {listingHistoryQuery.isLoading ? <LoadingScreen label="Đang tải history..." /> : null}
+            {listingHistoryQuery.isError ? (
+              <ErrorState title="Không thể tải lịch sử" message="Vui lòng thử lại." action={<button className="action-button" type="button" onClick={() => void listingHistoryQuery.refetch()}>Thử lại</button>} />
+            ) : null}
+            {listingHistoryQuery.data && listingHistoryQuery.data.length === 0 ? (
+              <EmptyState title="Không có lịch sử" message="Listing này chưa có bản ghi snapshot." />
+            ) : null}
+            {listingHistoryQuery.data && listingHistoryQuery.data.length > 0 ? (
+              <div className="surface" style={{ borderRadius: '14px', overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '760px' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left', padding: '0.6rem' }}>Observed at</th>
+                      <th style={{ textAlign: 'left', padding: '0.6rem' }}>Price</th>
+                      <th style={{ textAlign: 'left', padding: '0.6rem' }}>Status</th>
+                      <th style={{ textAlign: 'left', padding: '0.6rem' }}>State hash</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-    </ModuleLayout>
+                  </thead>
+                  <tbody>
+                    {listingHistoryQuery.data.map((item) => (
+                      <tr key={item.id} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '0.65rem' }}>{formatDateTime(item.observed_at)}</td>
+                        <td style={{ padding: '0.65rem' }}>{item.price ?? 'N/A'}</td>
+                        <td style={{ padding: '0.65rem' }}>{item.listing_status ?? 'N/A'}</td>
+                        <td style={{ padding: '0.65rem' }}>{item.state_hash}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </section>
+        ) : null
+      }
+    </ModuleLayout >
   );
 }
