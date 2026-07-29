@@ -72,6 +72,7 @@ img {
 }
 
 input,
+select,
 textarea {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.92);
@@ -396,8 +397,9 @@ button:disabled {
 }
 
 .module-badge {
-  width: 3rem;
-  height: 3rem;
+  width: fit-content;
+  height: 2.5rem;
+  padding: 0 1rem;
   border-radius: 16px;
   display: grid;
   place-items: center;

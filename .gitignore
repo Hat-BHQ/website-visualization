@@ -68,3 +68,10 @@ apps/portal-web/dist/
 *.db
 docker-up.log
 .env
+
+# Google OAuth credentials
+secrets/*.json
+!secrets/*.example.json
+
+# Local command logs
+push-error.txt

@@ -109,7 +109,10 @@ async def _get_or_create_job(
 async def _find_active_job_id(session: AsyncSession, marketplace: str) -> UUID | None:
     stmt = (
         select(SyncJob.id)
-        .where(SyncJob.marketplace == marketplace, SyncJob.status.in_(["queued", "running"]))
+        .where(
+            SyncJob.marketplace == marketplace,
+            SyncJob.status.in_(["queued", "running"]),
+        )
         .order_by(SyncJob.created_at.desc())
         .limit(1)
     )
@@ -117,12 +120,16 @@ async def _find_active_job_id(session: AsyncSession, marketplace: str) -> UUID |
     return result.scalar_one_or_none()
 
 
-async def _upsert_research_target(session: AsyncSession, target_payload: dict[str, Any]) -> ResearchTarget | None:
+async def _upsert_research_target(
+    session: AsyncSession, target_payload: dict[str, Any]
+) -> ResearchTarget | None:
     product_code = target_payload.get("product_code")
     if not product_code:
         return None
 
-    result = await session.execute(select(ResearchTarget).where(ResearchTarget.product_code == product_code))
+    result = await session.execute(
+        select(ResearchTarget).where(ResearchTarget.product_code == product_code)
+    )
     target = result.scalar_one_or_none()
     if target is None:
         target = ResearchTarget(
@@ -138,15 +145,21 @@ async def _upsert_research_target(session: AsyncSession, target_payload: dict[st
 
     target.brand = target_payload.get("brand") or target.brand
     target.model = target_payload.get("model") or target.model
-    target.target_category = target_payload.get("target_category") or target.target_category
+    target.target_category = (
+        target_payload.get("target_category") or target.target_category
+    )
     await session.flush()
     return target
 
 
-async def _upsert_listing(session: AsyncSession, marketplace: str, listing_payload: dict[str, Any]) -> tuple[Any, str]:
+async def _upsert_listing(
+    session: AsyncSession, marketplace: str, listing_payload: dict[str, Any]
+) -> tuple[Any, str]:
     listing_model = MARKETPLACE_MODELS[marketplace]["listing"]
     result = await session.execute(
-        select(listing_model).where(listing_model.external_listing_id == listing_payload["external_listing_id"])
+        select(listing_model).where(
+            listing_model.external_listing_id == listing_payload["external_listing_id"]
+        )
     )
     existing = result.scalar_one_or_none()
     now = datetime.now(tz=UTC)
@@ -249,7 +262,9 @@ async def _record_row_error(
             marketplace=marketplace,
             source_sheet=SHEET_NAMES[marketplace],
             source_row_number=row_number,
-            external_listing_id=row.get("external_listing_id") or row.get("id") or row.get("listing_id"),
+            external_listing_id=row.get("external_listing_id")
+            or row.get("id")
+            or row.get("listing_id"),
             processing_stage="pipeline",
             error_code=error.__class__.__name__,
             error_message=str(error),
@@ -291,14 +306,14 @@ async def run_marketplace_sync(
 
     engine = create_engine(settings)
     sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
-
+    sheet_name = SHEET_NAMES.get(marketplace)
     try:
         async with sessionmaker() as session:
             job = await _get_or_create_job(session, marketplace, trigger_type, job_id)
             rows = read_sheet_rows(
                 spreadsheet_id=settings.google_spreadsheet_id,
-                service_account_file=settings.google_service_account_file,
-                sheet_name=SHEET_NAMES[marketplace],
+                oauth_token_file=settings.google_oauth_token_file,
+                sheet_name=sheet_name,
             )
 
             stats = SyncStats(total_source_rows=len(rows))
@@ -306,10 +321,22 @@ async def run_marketplace_sync(
                 try:
                     async with session.begin_nested():
                         normalized = normalize_listing_row(marketplace, row)
-                        target = await _upsert_research_target(session, normalized["target"])
-                        listing, action = await _upsert_listing(session, marketplace, normalized["listing"])
-                        await _upsert_listing_match(session, marketplace, listing.id, target, normalized["match"])
-                        await _create_snapshot_if_changed(session, marketplace, listing, action)
+                        target = await _upsert_research_target(
+                            session, normalized["target"]
+                        )
+                        listing, action = await _upsert_listing(
+                            session, marketplace, normalized["listing"]
+                        )
+                        await _upsert_listing_match(
+                            session,
+                            marketplace,
+                            listing.id,
+                            target,
+                            normalized["match"],
+                        )
+                        await _create_snapshot_if_changed(
+                            session, marketplace, listing, action
+                        )
 
                         if action == "inserted":
                             stats.inserted_rows += 1
@@ -319,7 +346,9 @@ async def run_marketplace_sync(
                             stats.unchanged_rows += 1
                 except Exception as row_error:
                     stats.error_rows += 1
-                    await _record_row_error(session, job, marketplace, index, row, row_error)
+                    await _record_row_error(
+                        session, job, marketplace, index, row, row_error
+                    )
 
             job.total_source_rows = stats.total_source_rows
             job.inserted_rows = stats.inserted_rows
@@ -329,7 +358,9 @@ async def run_marketplace_sync(
             job.error_rows = stats.error_rows
             job.status = "partial_success" if stats.error_rows > 0 else "success"
             job.completed_at = datetime.now(tz=UTC)
-            job.error_summary = f"{stats.error_rows} rows failed" if stats.error_rows else None
+            job.error_summary = (
+                f"{stats.error_rows} rows failed" if stats.error_rows else None
+            )
             await session.commit()
 
             return {

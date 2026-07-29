@@ -106,15 +106,29 @@ def parse_datetime(value: str | None) -> datetime | None:
 
 def to_marketplace_datetime(marketplace: str, row: dict[str, str]) -> datetime | None:
     if marketplace == "etsy":
-        unix_dt = parse_etsy_unix_timestamp(_pick(row, ["etsy_unix_timestamp", "unix_timestamp", "timestamp", "created_timestamp"]))
+        unix_dt = parse_etsy_unix_timestamp(
+            _pick(
+                row,
+                [
+                    "etsy_unix_timestamp",
+                    "unix_timestamp",
+                    "timestamp",
+                    "created_timestamp",
+                ],
+            )
+        )
         if unix_dt is not None:
             return unix_dt
 
-    explicit_dt = parse_datetime(_pick(row, ["published_at", "published_datetime", "created_at", "datetime"]))
+    explicit_dt = parse_datetime(
+        _pick(row, ["published_at", "published_datetime", "created_at", "datetime"])
+    )
     if explicit_dt is not None:
         return explicit_dt
 
-    serial_date = parse_google_serial_date(_pick(row, ["published_date", "research_date", "date"]))
+    serial_date = parse_google_serial_date(
+        _pick(row, ["published_date", "research_date", "date"])
+    )
     if serial_date is None:
         return None
     return datetime.combine(serial_date, datetime.min.time()).replace(tzinfo=UTC)
@@ -127,7 +141,9 @@ def build_state_hash(payload: dict) -> str:
 
 def normalize_listing_row(marketplace: str, row: dict[str, str]) -> dict:
     external_listing_id = normalize_external_id(
-        _pick(row, ["external_listing_id", "listing_id", "id", "item_id", "Item ID", "ID"])
+        _pick(
+            row, ["external_listing_id", "listing_id", "id", "item_id", "Item ID", "ID"]
+        )
     )
     listing_title = safe_text(_pick(row, ["listing_title", "title", "name"]))
     listing_url = safe_text(_pick(row, ["listing_url", "url", "listing_link"]))
@@ -162,19 +178,37 @@ def normalize_listing_row(marketplace: str, row: dict[str, str]) -> dict:
         "total_price": total_price,
         "currency": safe_text(_pick(row, ["currency"])),
         "listing_views": listing_views,
-        "listing_status": safe_text(_pick(row, ["listing_status", "status"])) or "active",
+        "listing_status": safe_text(_pick(row, ["listing_status", "status"]))
+        or "active",
         "raw_payload": row,
     }
 
+    seller_or_shop = safe_text(
+        _pick(
+            row,
+            [
+                "seller_or_shop",
+                "seller_name",
+                "shop_name",
+                "seller",
+                "seller_username",
+            ],
+        )
+    )
+
     if marketplace == "ebay":
-        base_payload["seller_name"] = safe_text(_pick(row, ["seller_name", "seller"]))
+        base_payload["seller_name"] = seller_or_shop
         base_payload["status_reason"] = safe_text(_pick(row, ["status_reason"]))
-        base_payload["buying_options"] = {"buy_it_now": safe_bool(_pick(row, ["buy_it_now"]))}
+        base_payload["buying_options"] = {
+            "buy_it_now": safe_bool(_pick(row, ["buy_it_now"]))
+        }
+
     elif marketplace == "reverb":
-        base_payload["shop_name"] = safe_text(_pick(row, ["shop_name", "seller_name", "seller"]))
+        base_payload["shop_name"] = seller_or_shop
+
     elif marketplace == "etsy":
         base_payload["shop_id"] = safe_text(_pick(row, ["shop_id"]))
-        base_payload["shop_name"] = safe_text(_pick(row, ["shop_name", "seller_name", "seller"]))
+        base_payload["shop_name"] = seller_or_shop
         base_payload["taxonomy_id"] = safe_text(_pick(row, ["taxonomy_id"]))
         base_payload["etsy_data"] = {
             "is_digital": safe_bool(_pick(row, ["is_digital"])),
@@ -207,7 +241,9 @@ def normalize_listing_row(marketplace: str, row: dict[str, str]) -> dict:
             "keyword": keyword,
             "match_type": safe_text(_pick(row, ["match_type"])) or "keyword",
             "exclude_flag": safe_bool(_pick(row, ["exclude_flag"])) or False,
-            "raw_confidence": safe_decimal(_pick(row, ["raw_confidence", "confidence"])),
+            "raw_confidence": safe_decimal(
+                _pick(row, ["raw_confidence", "confidence"])
+            ),
             "research_date": research_date,
         },
     }
