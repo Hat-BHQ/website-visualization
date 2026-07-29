@@ -13,11 +13,12 @@ import {
 } from '@/auth/sessionStore';
 
 export function useAuth() {
-  const snapshot = useSyncExternalStore(
-    subscribe,
-    getAuthSnapshot,
-    getAuthSnapshot,
-  );
+  const snapshot =
+    useSyncExternalStore(
+      subscribe,
+      getAuthSnapshot,
+      getAuthSnapshot,
+    );
 
   return {
     ...snapshot,
@@ -25,8 +26,9 @@ export function useAuth() {
     isAuthenticated: Boolean(
       snapshot.accessToken &&
       snapshot.user &&
-      snapshot.expiresAt &&
-      snapshot.expiresAt > Date.now(),
+      snapshot.idleExpiresAt &&
+      snapshot.idleExpiresAt >
+      Date.now(),
     ),
 
     login,

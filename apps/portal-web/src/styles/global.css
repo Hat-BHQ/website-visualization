@@ -273,6 +273,7 @@ button:disabled {
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
+  overflow: hidden;
 }
 
 .main-shell {
