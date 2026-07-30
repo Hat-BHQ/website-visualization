@@ -155,3 +155,36 @@ export interface ListingFilterOptions {
   currency: ListingFacetOption[];
   price_range: ListingPriceRange;
 }
+
+export type ListingExportFormat =
+  | 'xlsx'
+  | 'pdf'
+  | 'google_sheets';
+
+export type ListingExportFilters = Omit<
+  ListingListParams,
+  'page' | 'page_size'
+>;
+
+export interface ListingExportRequest {
+  format: ListingExportFormat;
+  fields: string[];
+  filters: ListingExportFilters;
+}
+
+export interface GoogleSheetsExportResponse {
+  spreadsheet_id: string;
+  spreadsheet_url: string;
+  exported_rows: number;
+}
+
+export type ListingExportResult =
+  | {
+    kind: 'file';
+    blob: Blob;
+    filename: string;
+  }
+  | {
+    kind: 'google_sheets';
+    data: GoogleSheetsExportResponse;
+  };

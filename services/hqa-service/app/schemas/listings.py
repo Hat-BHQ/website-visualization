@@ -64,24 +64,6 @@ class ListingFilterOptionsResponse(BaseModel):
     price_range: ListingPriceRange
 
 
-class ListingListRequest(BaseModel):
-    page: int = Field(default=1, ge=1)
-    page_size: int = Field(default=30, ge=1, le=100)
-    q: str | None = None
-    status: str | None = None
-    category: str | None = None
-    condition: str | None = None
-    seller: str | None = None
-    product_id: str | None = None
-    keyword: str | None = None
-    min_price: Decimal | None = None
-    max_price: Decimal | None = None
-    date_from: date | None = None
-    date_to: date | None = None
-    sort_by: str | None = None
-    sort_order: str = "desc"
-
-
 class ListingListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

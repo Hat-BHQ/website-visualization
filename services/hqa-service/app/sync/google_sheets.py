@@ -16,7 +16,8 @@ def normalize_header(value: object) -> str:
 
 
 SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    # Scope đọc và ghi Google Sheets.
+    "https://www.googleapis.com/auth/spreadsheets",
 ]
 
 

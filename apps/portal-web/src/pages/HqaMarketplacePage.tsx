@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-
+import { ListingDetailModal } from '@/components/ListingDetailModal';
 import { isForbiddenError } from '@/api/errors';
 import {
   getMarketplaceFilterOptions,
@@ -9,7 +9,8 @@ import {
   getMarketplaceListingHistory,
   getMarketplaceListings,
 } from '@/api/hqa';
-
+import { canExportHqaMarketplace } from '@/auth/permissions';
+import { ListingExportModal } from '@/components/ListingExportModal';
 import {
   FacetMultiSelect,
 } from '@/components/FacetMultiSelect';
@@ -64,6 +65,13 @@ export function HqaMarketplacePage({
   marketplace: Marketplace;
   title: string;
 }) {
+  const canExport =
+    canExportHqaMarketplace(
+      user,
+      marketplace,
+    );
+  const [exportModalOpen, setExportModalOpen] =
+    useState(false);
   const navigate = useNavigate();
   const [filters, setFilters] = useState<ListingListParams>(defaultFilters);
   const [form, setForm] = useState<ListingListParams>(defaultFilters);
@@ -326,9 +334,34 @@ export function HqaMarketplacePage({
           </label>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-          <button className="action-button" type="button" onClick={applyFilters}>Áp dụng filter</button>
-          <button className="action-button secondary" type="button" onClick={resetFilters}>Reset filter</button>
+        <div className="filter-actions">
+          <button
+            className="action-button"
+            type="button"
+            onClick={applyFilters}
+          >
+            Áp dụng filter
+          </button>
+
+          <button
+            className="action-button secondary"
+            type="button"
+            onClick={resetFilters}
+          >
+            Reset filter
+          </button>
+
+          {canExport ? (
+            <button
+              className="action-button export-button"
+              type="button"
+              onClick={() => {
+                setExportModalOpen(true);
+              }}
+            >
+              Xuất dữ liệu
+            </button>
+          ) : null}
         </div>
       </section>
       <div className="active-filters">
@@ -458,68 +491,36 @@ export function HqaMarketplacePage({
 
       {
         selectedListingId ? (
-          <section className="module-card" style={{ marginTop: '1rem' }}>
-            <h3 style={{ marginTop: 0 }}>Listing detail</h3>
-            {listingDetailQuery.isLoading ? <LoadingScreen label="Đang tải chi tiết listing..." /> : null}
-            {listingDetailQuery.isError ? (
-              <ErrorState title="Không thể tải chi tiết" message="Vui lòng thử lại." action={<button className="action-button" type="button" onClick={() => void listingDetailQuery.refetch()}>Thử lại</button>} />
-            ) : null}
-            {listingDetailQuery.data ? (
-              <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
-                  <strong>Title</strong>
-                  <div style={{ color: 'var(--muted)', marginTop: '0.35rem' }}>{listingDetailQuery.data.listing_title}</div>
-                </div>
-                <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
-                  <strong>Listing URL</strong>
-                  <div style={{ marginTop: '0.35rem' }}><a href={listingDetailQuery.data.listing_url} target="_blank" rel="noreferrer">{listingDetailQuery.data.listing_url}</a></div>
-                </div>
-                <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
-                  <strong>Last updated</strong>
-                  <div style={{ color: 'var(--muted)', marginTop: '0.35rem' }}>{formatDateTime(listingDetailQuery.data.last_seen_at)}</div>
-                </div>
-                <div className="surface" style={{ padding: '0.9rem', borderRadius: '14px' }}>
-                  <strong>State hash</strong>
-                  <div style={{ color: 'var(--muted)', marginTop: '0.35rem' }}>{listingDetailQuery.data.state_hash ?? 'N/A'}</div>
-                </div>
-              </div>
-            ) : null}
-
-            <h4 style={{ marginTop: '1.25rem', marginBottom: '0.75rem' }}>History</h4>
-            {listingHistoryQuery.isLoading ? <LoadingScreen label="Đang tải history..." /> : null}
-            {listingHistoryQuery.isError ? (
-              <ErrorState title="Không thể tải lịch sử" message="Vui lòng thử lại." action={<button className="action-button" type="button" onClick={() => void listingHistoryQuery.refetch()}>Thử lại</button>} />
-            ) : null}
-            {listingHistoryQuery.data && listingHistoryQuery.data.length === 0 ? (
-              <EmptyState title="Không có lịch sử" message="Listing này chưa có bản ghi snapshot." />
-            ) : null}
-            {listingHistoryQuery.data && listingHistoryQuery.data.length > 0 ? (
-              <div className="surface" style={{ borderRadius: '14px', overflow: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '760px' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', padding: '0.6rem' }}>Observed at</th>
-                      <th style={{ textAlign: 'left', padding: '0.6rem' }}>Price</th>
-                      <th style={{ textAlign: 'left', padding: '0.6rem' }}>Status</th>
-                      <th style={{ textAlign: 'left', padding: '0.6rem' }}>State hash</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {listingHistoryQuery.data.map((item) => (
-                      <tr key={item.id} style={{ borderTop: '1px solid var(--border)' }}>
-                        <td style={{ padding: '0.65rem' }}>{formatDateTime(item.observed_at)}</td>
-                        <td style={{ padding: '0.65rem' }}>{item.price ?? 'N/A'}</td>
-                        <td style={{ padding: '0.65rem' }}>{item.listing_status ?? 'N/A'}</td>
-                        <td style={{ padding: '0.65rem' }}>{item.state_hash}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-          </section>
+          <ListingDetailModal
+            open={Boolean(selectedListingId)}
+            detail={listingDetailQuery.data}
+            history={listingHistoryQuery.data}
+            detailLoading={listingDetailQuery.isLoading}
+            historyLoading={listingHistoryQuery.isLoading}
+            detailError={listingDetailQuery.isError}
+            historyError={listingHistoryQuery.isError}
+            onClose={() => {
+              setSelectedListingId(null);
+            }}
+            onRetryDetail={() => {
+              void listingDetailQuery.refetch();
+            }}
+            onRetryHistory={() => {
+              void listingHistoryQuery.refetch();
+            }}
+          />
         ) : null
       }
+      {canExport ? (
+        <ListingExportModal
+          open={exportModalOpen}
+          marketplace={marketplace}
+          filters={filters}
+          onClose={() => {
+            setExportModalOpen(false);
+          }}
+        />
+      ) : null}
     </ModuleLayout >
   );
 }

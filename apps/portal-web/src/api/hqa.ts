@@ -12,6 +12,9 @@ import type {
   PageResponse,
   SyncJobResponse,
   SyncTriggerResponse,
+  GoogleSheetsExportResponse,
+  ListingExportRequest,
+  ListingExportResult,
 } from '@/types/hqa';
 
 /**
@@ -59,6 +62,88 @@ function appendMany(
       searchParams.append(key, normalizedValue);
     }
   });
+}
+
+function getDownloadFilename(
+  contentDisposition?: string,
+) {
+  if (!contentDisposition) {
+    return null;
+  }
+
+  const utf8Match =
+    contentDisposition.match(
+      /filename\*=UTF-8''([^;]+)/i,
+    );
+
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const normalMatch =
+    contentDisposition.match(
+      /filename="?([^"]+)"?/i,
+    );
+
+  return normalMatch?.[1] ?? null;
+}
+
+/**
+ * Export listing theo bộ filter hiện đang được áp dụng.
+ */
+export async function exportMarketplaceListings(
+  marketplace: Marketplace,
+  payload: ListingExportRequest,
+): Promise<ListingExportResult> {
+  const endpoint =
+    `/api/hqa/${marketplace}/listings/export`;
+
+  if (payload.format === 'google_sheets') {
+    const response =
+      await apiClient.post<
+        GoogleSheetsExportResponse
+      >(
+        endpoint,
+        payload,
+        {
+          baseURL: hqaBaseUrl,
+        },
+      );
+
+    return {
+      kind: 'google_sheets',
+      data: response.data,
+    };
+  }
+
+  const response =
+    await apiClient.post<Blob>(
+      endpoint,
+      payload,
+      {
+        baseURL: hqaBaseUrl,
+        responseType: 'blob',
+      },
+    );
+
+  const defaultExtension =
+    payload.format === 'pdf'
+      ? 'pdf'
+      : 'xlsx';
+
+  const filename =
+    getDownloadFilename(
+      response.headers[
+      'content-disposition'
+      ],
+    ) ??
+    `hqa_${marketplace}_export.${defaultExtension}`;
+
+  return {
+    kind: 'file',
+    blob: response.data,
+    filename,
+  };
 }
 
 /**

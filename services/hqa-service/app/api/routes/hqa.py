@@ -1,10 +1,31 @@
 from __future__ import annotations
 
+import io
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    Query,
+    Request,
+    status,
+)
+from fastapi.responses import (
+    JSONResponse,
+    StreamingResponse,
+)
+
+from app.schemas.exports import (
+    GoogleSheetsExportResponse,
+    ListingExportRequest,
+)
+from app.services.export_service import (
+    export_marketplace_listings,
+)
+
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Literal
 
@@ -145,6 +166,43 @@ def register_marketplace_routes(marketplace: str) -> None:
     ) -> list[ListingSnapshotItem]:
         return await get_marketplace_listing_history(session, marketplace, id)
 
+    async def export_route(
+        payload: ListingExportRequest,
+        request: Request,
+        session: AsyncSession = Depends(get_session_from_app),
+    ):
+        """
+        Export toàn bộ listing phù hợp với filter hiện tại.
+
+        Quyền truy cập được kiểm tra tại add_api_route
+        bằng permission hqa.<marketplace>.export.
+        """
+
+        result = await export_marketplace_listings(
+            session=session,
+            marketplace=marketplace,
+            payload=payload,
+            settings=request.app.state.settings,
+        )
+
+        if result.kind == "google_sheets":
+            return JSONResponse(
+                content=GoogleSheetsExportResponse(
+                    spreadsheet_id=(result.spreadsheet_id),
+                    spreadsheet_url=(result.spreadsheet_url),
+                    exported_rows=(result.exported_rows),
+                ).model_dump()
+            )
+
+        return StreamingResponse(
+            io.BytesIO(result.content),
+            media_type=result.media_type,
+            headers={
+                "Content-Disposition": (f'attachment; filename="{result.filename}"'),
+                "X-Exported-Rows": str(result.exported_rows),
+            },
+        )
+
     router.add_api_route(
         f"/{marketplace}/listings",
         list_route,
@@ -167,6 +225,22 @@ def register_marketplace_routes(marketplace: str) -> None:
             )
         ],
         name=f"get_{marketplace}_listing_filter_options",
+    )
+    router.add_api_route(
+        f"/{marketplace}/listings/export",
+        export_route,
+        methods=["POST"],
+        # Endpoint trả file hoặc JSON tùy format.
+        response_model=None,
+        dependencies=[
+            Depends(
+                require_permission(
+                    f"hqa.{marketplace}.export",
+                    "hqa",
+                )
+            )
+        ],
+        name=(f"export_{marketplace}_listings"),
     )
     router.add_api_route(
         f"/{marketplace}/listings/{{id}}",
