@@ -194,15 +194,15 @@ export function ListingDetailModal({
                     {detail ? (
                         <>
                             <div className="listing-detail-layout">
-                                {detail.image_url ? (
-                                    <div className="listing-detail-image-wrap">
+                                <div className="listing-detail-image-wrap">
+                                    {detail.image_url ? (
                                         <img
                                             className="listing-detail-image"
                                             src={detail.image_url}
                                             alt={detail.listing_title}
                                         />
-                                    </div>
-                                ) : null}
+                                    ) : null}
+                                </div>
 
                                 <div className="listing-detail-grid">
                                     <DetailField

@@ -29,10 +29,9 @@ export function canExportHqaMarketplace(
     const requiredPermission =
         `hqa.${marketplace}.export`;
 
-    return (
-        hqaModule.role === 'admin' &&
-        hqaModule.permissions.includes(
-            requiredPermission,
-        )
+    // Permission là nguồn sự thật duy nhất. Role đã được backend
+    // ánh xạ thành danh sách permission trong /api/auth/me.
+    return hqaModule.permissions.includes(
+        requiredPermission,
     );
 }

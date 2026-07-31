@@ -1,6 +1,7 @@
 from __future__ import annotations
 import io
 import json
+from html import escape
 
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -14,11 +15,11 @@ from fastapi import HTTPException, status
 
 from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
-from openpyxl.styles import Alignment, Font
+from openpyxl.styles import Alignment, Font, PatternFill
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -31,6 +32,7 @@ from reportlab.platypus import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from app.core.config import Settings
 from app.repositories.hqa_repository import (
@@ -125,10 +127,22 @@ EXPORT_COLUMNS: dict[str, ExportColumn] = {
             "listing_url",
         ),
     ),
+    # Alias tương thích cho giao diện cũ. Nếu cần đúng tên cột DB,
+    # frontend nên chọn seller_name hoặc shop_name.
     "seller": ExportColumn(
         "seller",
-        "Người bán / Shop",
+        "seller",
         get_seller,
+    ),
+    "seller_name": ExportColumn(
+        "seller_name",
+        "seller_name",
+        lambda item: safe_getattr(item, "seller_name"),
+    ),
+    "shop_name": ExportColumn(
+        "shop_name",
+        "shop_name",
+        lambda item: safe_getattr(item, "shop_name"),
     ),
     "shop_id": ExportColumn(
         "shop_id",
@@ -234,9 +248,14 @@ EXPORT_COLUMNS: dict[str, ExportColumn] = {
             "currency",
         ),
     ),
+    "quantity": ExportColumn(
+        "quantity",
+        "quantity",
+        lambda item: safe_getattr(item, "quantity"),
+    ),
     "listing_views": ExportColumn(
         "listing_views",
-        "Lượt xem",
+        "listing_views",
         lambda item: safe_getattr(
             item,
             "listing_views",
@@ -384,7 +403,11 @@ def build_xlsx(
 
         cell.font = Font(
             bold=True,
-            color="FFFFFF",
+            color="000000",
+        )
+        cell.fill = PatternFill(
+            fill_type="solid",
+            fgColor="9fc5e8",
         )
 
         cell.alignment = Alignment(
@@ -394,6 +417,7 @@ def build_xlsx(
 
         header_cells.append(cell)
 
+    worksheet.freeze_panes = "A2"
     worksheet.append(header_cells)
 
     for row in rows:
@@ -457,21 +481,31 @@ def build_pdf(
     title_style.fontName = "DejaVuSans-Bold"
     title_style.fontSize = 14
 
-    cell_style = styles["BodyText"]
-    cell_style.fontName = "DejaVuSans"
-    cell_style.fontSize = 6
-    cell_style.leading = 8
+    # Không dùng chung styles["BodyText"] cho header và body vì
+    # ReportLab trả về cùng một object; sửa header sẽ làm body thành
+    # chữ trắng và khiến dữ liệu trông như bị mất.
+    cell_style = ParagraphStyle(
+        "ExportCell",
+        parent=styles["BodyText"],
+        fontName="DejaVuSans",
+        fontSize=6,
+        leading=8,
+        textColor=colors.black,
+    )
 
-    header_style = styles["BodyText"]
-    header_style.fontName = "DejaVuSans-Bold"
-    header_style.fontSize = 6
-    header_style.leading = 8
-    header_style.textColor = colors.white
+    header_style = ParagraphStyle(
+        "ExportHeader",
+        parent=styles["BodyText"],
+        fontName="DejaVuSans-Bold",
+        fontSize=6,
+        leading=8,
+        textColor=colors.white,
+    )
 
     pdf_rows = [
         [
             Paragraph(
-                str(header),
+                escape(str(header)),
                 header_style,
             )
             for header in headers
@@ -482,7 +516,7 @@ def build_pdf(
         pdf_rows.append(
             [
                 Paragraph(
-                    str(value),
+                    escape(str(value)),
                     cell_style,
                 )
                 for value in row
@@ -686,7 +720,7 @@ async def export_marketplace_listings(
                 detail=(f"PDF chỉ hỗ trợ tối đa {PDF_MAX_COLUMNS} cột."),
             )
 
-    headers = [column.label for column in columns]
+    headers = [column.key for column in columns]
 
     rows = build_export_rows(
         items,
@@ -760,9 +794,33 @@ async def export_marketplace_listings(
     # Worker thread sẽ gọi create_sheet_job().
     # create_sheet_job() sau đó gọi create_google_sheet()
     # với toàn bộ tham số đã được partial gắn sẵn.
-    spreadsheet_id, spreadsheet_url = await to_thread.run_sync(
-        create_sheet_job,
-    )
+    try:
+        spreadsheet_id, spreadsheet_url = await to_thread.run_sync(
+            create_sheet_job,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không tìm thấy Google OAuth token trên server.",
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except HttpError as exc:
+        google_status = getattr(exc.resp, "status", None)
+        if google_status in {401, 403}:
+            detail = (
+                "Google OAuth token không có quyền ghi Google Sheets. "
+                "Hãy tạo lại token với scope spreadsheets (không phải readonly)."
+            )
+        else:
+            detail = "Google Sheets API không thể tạo spreadsheet."
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=detail,
+        ) from exc
 
     return GoogleSheetExportResult(
         kind="google_sheets",

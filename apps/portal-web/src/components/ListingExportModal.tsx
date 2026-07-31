@@ -4,6 +4,8 @@ import {
     useState,
 } from 'react';
 
+import { isAxiosError } from 'axios';
+
 import {
     exportMarketplaceListings,
 } from '@/api/hqa';
@@ -34,8 +36,12 @@ const EXPORT_FIELDS: ExportFieldOption[] = [
         label: 'Listing URL',
     },
     {
-        key: 'seller',
-        label: 'Người bán / Shop',
+        key: 'seller_name',
+        label: 'Tên người bán (eBay)',
+    },
+    {
+        key: 'shop_name',
+        label: 'Tên shop (Reverb/Etsy)',
     },
     { key: 'shop_id', label: 'Shop ID' },
     {
@@ -91,6 +97,10 @@ const EXPORT_FIELDS: ExportFieldOption[] = [
         label: 'Lượt xem',
     },
     {
+        key: 'quantity',
+        label: 'Số lượng',
+    },
+    {
         key: 'listing_status',
         label: 'Trạng thái',
     },
@@ -120,20 +130,96 @@ const EXPORT_FIELDS: ExportFieldOption[] = [
     },
 ];
 
-const DEFAULT_FIELDS = [
-    'external_listing_id',
-    'listing_title',
-    'listing_url',
-    'seller',
-    'category_name',
-    'condition_name',
-    'current_price',
-    'shipping_price',
-    'total_price',
-    'currency',
-    'listing_status',
-    'last_seen_at',
-];
+const PDF_MAX_FIELDS = 10;
+
+function getDefaultFields(
+    marketplace: Marketplace,
+) {
+    const sellerField =
+        marketplace === 'ebay'
+            ? 'seller_name'
+            : 'shop_name';
+
+    // 10 trường để mặc định cũng dùng được ngay với PDF.
+    return [
+        'external_listing_id',
+        'listing_title',
+        'listing_url',
+        sellerField,
+        'category_name',
+        'condition_name',
+        'current_price',
+        'total_price',
+        'currency',
+        'listing_status',
+    ];
+}
+
+function readApiDetail(data: unknown): string | null {
+    if (typeof data === 'string' && data.trim()) {
+        try {
+            return readApiDetail(JSON.parse(data));
+        } catch {
+            return data;
+        }
+    }
+
+    if (!data || typeof data !== 'object') {
+        return null;
+    }
+
+    const detail = (data as { detail?: unknown }).detail;
+
+    if (typeof detail === 'string') {
+        return detail;
+    }
+
+    if (detail && typeof detail === 'object') {
+        const message = (detail as { message?: unknown })
+            .message;
+
+        if (typeof message === 'string') {
+            return message;
+        }
+    }
+
+    return null;
+}
+
+async function getExportErrorMessage(
+    error: unknown,
+): Promise<string> {
+    if (!isAxiosError(error)) {
+        return 'Không thể xuất dữ liệu. Vui lòng thử lại.';
+    }
+
+    const status = error.response?.status;
+    let responseData: unknown = error.response?.data;
+
+    // Với Excel/PDF, Axios được cấu hình responseType=blob nên
+    // cả lỗi JSON từ FastAPI cũng được trả về dưới dạng Blob.
+    if (responseData instanceof Blob) {
+        const rawText = await responseData.text();
+        responseData = rawText;
+    }
+
+    const detail = readApiDetail(responseData);
+
+    if (status === 403) {
+        return detail ?? 'Tài khoản không có quyền xuất dữ liệu marketplace này.';
+    }
+
+    if (status === 422) {
+        return detail ?? 'Dữ liệu hoặc lựa chọn export không hợp lệ.';
+    }
+
+    if (status === 502 || status === 503) {
+        return detail ?? 'Dịch vụ export bên ngoài chưa sẵn sàng.';
+    }
+
+    return detail ?? 'Không thể xuất dữ liệu. Vui lòng thử lại.';
+}
+
 
 export function ListingExportModal({
     open,
@@ -150,13 +236,27 @@ export function ListingExportModal({
         useState<ListingExportFormat>('xlsx');
 
     const [selectedFields, setSelectedFields] =
-        useState<string[]>(DEFAULT_FIELDS);
+        useState<string[]>(() =>
+            getDefaultFields(marketplace),
+        );
 
     const [isExporting, setIsExporting] =
         useState(false);
 
     const [errorMessage, setErrorMessage] =
         useState('');
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        setFormat('xlsx');
+        setSelectedFields(
+            getDefaultFields(marketplace),
+        );
+        setErrorMessage('');
+    }, [open, marketplace]);
 
     useEffect(() => {
         if (!open) {
@@ -193,6 +293,10 @@ export function ListingExportModal({
             EXPORT_FIELDS.length,
         [selectedFields],
     );
+
+    const pdfFieldLimitExceeded =
+        format === 'pdf' &&
+        selectedFields.length > PDF_MAX_FIELDS;
 
     if (!open) {
         return null;
@@ -234,6 +338,13 @@ export function ListingExportModal({
         if (selectedFields.length === 0) {
             setErrorMessage(
                 'Vui lòng chọn ít nhất một trường.',
+            );
+            return;
+        }
+
+        if (pdfFieldLimitExceeded) {
+            setErrorMessage(
+                `PDF chỉ hỗ trợ tối đa ${PDF_MAX_FIELDS} trường.`,
             );
             return;
         }
@@ -281,7 +392,7 @@ export function ListingExportModal({
             console.error(error);
 
             setErrorMessage(
-                'Không thể xuất dữ liệu. Vui lòng kiểm tra quyền hoặc thử lại.',
+                await getExportErrorMessage(error),
             );
         } finally {
             setIsExporting(false);
@@ -339,6 +450,7 @@ export function ListingExportModal({
                                     event.target
                                         .value as ListingExportFormat,
                                 );
+                                setErrorMessage('');
                             }}
                         >
                             <option value="xlsx">
@@ -357,9 +469,11 @@ export function ListingExportModal({
 
                     {format === 'pdf' ? (
                         <p className="export-notice">
-                            PDF hỗ trợ tối đa 10 trường và
-                            5.000 dòng. Với dữ liệu lớn nên
-                            chọn Excel hoặc Google Sheets.
+                            PDF hỗ trợ tối đa {PDF_MAX_FIELDS}
+                            {' '}trường và 5.000 dòng. Hiện đã
+                            chọn {selectedFields.length} trường.
+                            Với dữ liệu lớn nên chọn Excel hoặc
+                            Google Sheets.
                         </p>
                     ) : null}
 
@@ -401,7 +515,9 @@ export function ListingExportModal({
                                     }}
                                 />
 
-                                <span>{field.label}</span>
+                                <span title={field.label}>
+                                    {field.key}
+                                </span>
                             </label>
                         ))}
                     </div>
@@ -428,7 +544,8 @@ export function ListingExportModal({
                         className="action-button export-button"
                         disabled={
                             isExporting ||
-                            selectedFields.length === 0
+                            selectedFields.length === 0 ||
+                            pdfFieldLimitExceeded
                         }
                         onClick={() => {
                             void handleExport();

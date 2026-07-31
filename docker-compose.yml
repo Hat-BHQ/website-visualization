@@ -13,7 +13,11 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hq_portal} -d ${POSTGRES_DB:-postgres}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-hq_portal} -d ${POSTGRES_DB:-postgres}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 8
@@ -52,7 +56,11 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/ready', timeout=3)\""]
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://127.0.0.1:8000/api/ready'', timeout=3)"',
+        ]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -71,8 +79,10 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-access-secret}
       CELERY_TIMEZONE: ${CELERY_TIMEZONE:-Asia/Bangkok}
+      GOOGLE_AUTH_MODE: ${GOOGLE_AUTH_MODE:-oauth}
       GOOGLE_SPREADSHEET_ID: ${GOOGLE_SPREADSHEET_ID:-}
-      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-/run/secrets/google-service-account.json}
+      GOOGLE_OAUTH_CLIENT_FILE: ${GOOGLE_OAUTH_CLIENT_FILE:-/run/secrets/google-oauth-client.json}
+      GOOGLE_OAUTH_TOKEN_FILE: ${GOOGLE_OAUTH_TOKEN_FILE:-/run/secrets/google-oauth-token.json}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:5173}
       TZ: ${TZ:-Asia/Bangkok}
     volumes:
@@ -85,7 +95,11 @@ services:
       auth-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)\""]
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://127.0.0.1:8000/ready'', timeout=3)"',
+        ]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -97,15 +111,24 @@ services:
       context: ./services/hqa-service
     container_name: hq-hqa-worker
     restart: unless-stopped
-    command: ["celery", "-A", "app.worker.celery_app:celery_app", "worker", "--loglevel=INFO"]
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+      ]
     environment:
       HQA_DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
       DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-access-secret}
       CELERY_TIMEZONE: ${CELERY_TIMEZONE:-Asia/Bangkok}
+      GOOGLE_AUTH_MODE: ${GOOGLE_AUTH_MODE:-oauth}
       GOOGLE_SPREADSHEET_ID: ${GOOGLE_SPREADSHEET_ID:-}
-      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-/run/secrets/google-service-account.json}
+      GOOGLE_OAUTH_CLIENT_FILE: ${GOOGLE_OAUTH_CLIENT_FILE:-/run/secrets/google-oauth-client.json}
+      GOOGLE_OAUTH_TOKEN_FILE: ${GOOGLE_OAUTH_TOKEN_FILE:-/run/secrets/google-oauth-token.json}
       TZ: ${TZ:-Asia/Bangkok}
     volumes:
       - ./secrets:/run/secrets:ro
@@ -122,15 +145,24 @@ services:
       context: ./services/hqa-service
     container_name: hq-hqa-beat
     restart: unless-stopped
-    command: ["celery", "-A", "app.worker.celery_app:celery_app", "beat", "--loglevel=INFO"]
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app:celery_app",
+        "beat",
+        "--loglevel=INFO",
+      ]
     environment:
       HQA_DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
       DATABASE_URL: ${HQA_DATABASE_URL:-postgresql+psycopg://hq_portal:hq_portal_password@postgres:5432/hqa_db}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-access-secret}
       CELERY_TIMEZONE: ${CELERY_TIMEZONE:-Asia/Bangkok}
+      GOOGLE_AUTH_MODE: ${GOOGLE_AUTH_MODE:-oauth}
       GOOGLE_SPREADSHEET_ID: ${GOOGLE_SPREADSHEET_ID:-}
-      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-/run/secrets/google-service-account.json}
+      GOOGLE_OAUTH_CLIENT_FILE: ${GOOGLE_OAUTH_CLIENT_FILE:-/run/secrets/google-oauth-client.json}
+      GOOGLE_OAUTH_TOKEN_FILE: ${GOOGLE_OAUTH_TOKEN_FILE:-/run/secrets/google-oauth-token.json}
       TZ: ${TZ:-Asia/Bangkok}
     volumes:
       - ./secrets:/run/secrets:ro
@@ -157,7 +189,11 @@ services:
       auth-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)\""]
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://127.0.0.1:8000/ready'', timeout=3)"',
+        ]
       interval: 10s
       timeout: 5s
       retries: 12
