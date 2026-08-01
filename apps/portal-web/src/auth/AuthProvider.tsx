@@ -20,7 +20,7 @@ import {
   touchSessionActivity,
 } from '@/auth/sessionStore';
 
-const ACTIVITY_THROTTLE_MS = 30_000;
+const ACTIVITY_THROTTLE_MS = 10_000;
 
 function AuthLifecycleBridge() {
   const navigate = useNavigate();
@@ -149,6 +149,23 @@ function AuthLifecycleBridge() {
       },
     );
 
+    window.addEventListener(
+      'focus',
+      handleActivity,
+    );
+
+    document.addEventListener(
+      'input',
+      handleActivity,
+      true,
+    );
+
+    document.addEventListener(
+      'change',
+      handleActivity,
+      true,
+    );
+
     document.addEventListener(
       'visibilitychange',
       handleVisibilityChange,
@@ -178,6 +195,23 @@ function AuthLifecycleBridge() {
       window.removeEventListener(
         'touchstart',
         handleActivity,
+      );
+
+      window.removeEventListener(
+        'focus',
+        handleActivity,
+      );
+
+      document.removeEventListener(
+        'input',
+        handleActivity,
+        true,
+      );
+
+      document.removeEventListener(
+        'change',
+        handleActivity,
+        true,
       );
 
       document.removeEventListener(

@@ -188,3 +188,87 @@ export type ListingExportResult =
     kind: 'google_sheets';
     data: GoogleSheetsExportResponse;
   };
+
+export type DailyReportTableKey =
+  | 'all'
+  | 'table_1'
+  | 'table_2'
+  | 'table_3'
+  | 'table_4'
+  | 'table_5'
+  | 'table_6'
+  | 'table_7'
+  | 'table_8';
+
+export type DailyReportSort =
+  | 'last_updated_desc'
+  | 'newest_collected'
+  | 'price_desc'
+  | 'price_asc'
+  | 'title_asc';
+
+export interface DailyReportParams {
+  date?: string;
+  status: string[];
+  table: DailyReportTableKey;
+  sort: DailyReportSort;
+  page: number;
+  page_size: number;
+}
+
+export interface DailyReportSummary {
+  total_listings_on_selected_date: number;
+  new_listings_qualified: number;
+  ended_listings: number;
+  out_of_stock: number;
+}
+
+export interface DailyReportTableCount {
+  key: DailyReportTableKey;
+  label: string;
+  count: number;
+}
+
+export interface DailyReportItem {
+  id: string;
+  external_listing_id: string;
+  listing_title: string;
+  listing_url: string;
+
+  seller_name: string | null;
+  shop_name: string | null;
+
+  category_name: string | null;
+  condition_name: string | null;
+
+  current_price: string | null;
+  shipping_price: string | null;
+  total_price: string | null;
+  currency: string | null;
+
+  image_url: string | null;
+  listing_status: string;
+  status_reason: string | null;
+
+  published_at: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  report_at: string;
+  report_date: string;
+}
+
+export interface DailyReportResponse {
+  marketplace: Marketplace;
+  selected_date: string | null;
+
+  summary: DailyReportSummary;
+  status_options: ListingFacetOption[];
+  table_counts: DailyReportTableCount[];
+
+  items: DailyReportItem[];
+
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}

@@ -21,7 +21,14 @@ from app.schemas.exports import (
 from app.services.export_service import (
     export_marketplace_listings,
 )
-
+from app.schemas.daily_report import (
+    DailyReportResponse,
+    DailyReportSort,
+    DailyReportTableKey,
+)
+from app.services.daily_report_service import (
+    get_marketplace_daily_report,
+)
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
@@ -166,6 +173,43 @@ def register_marketplace_routes(marketplace: str) -> None:
     ) -> list[ListingSnapshotItem]:
         return await get_marketplace_listing_history(session, marketplace, id)
 
+    async def daily_report_route(
+        selected_date: date | None = Query(
+            default=None,
+            alias="date",
+        ),
+        status_filter: list[str] | None = Query(
+            default=None,
+            alias="status",
+        ),
+        table: DailyReportTableKey = Query(
+            default="all",
+        ),
+        sort: DailyReportSort = Query(
+            default="last_updated_desc",
+        ),
+        page: int = Query(
+            default=1,
+            ge=1,
+        ),
+        page_size: int = Query(
+            default=20,
+            ge=1,
+            le=100,
+        ),
+        session: AsyncSession = Depends(get_session_from_app),
+    ) -> DailyReportResponse:
+        return await get_marketplace_daily_report(
+            session,
+            marketplace=marketplace,
+            selected_date=selected_date,
+            status_filter=status_filter,
+            table_key=table,
+            sort_by=sort,
+            page=page,
+            page_size=page_size,
+        )
+
     async def export_route(
         payload: ListingExportRequest,
         request: Request,
@@ -225,6 +269,22 @@ def register_marketplace_routes(marketplace: str) -> None:
             )
         ],
         name=f"get_{marketplace}_listing_filter_options",
+    )
+
+    router.add_api_route(
+        f"/{marketplace}/daily-report",
+        daily_report_route,
+        methods=["GET"],
+        response_model=DailyReportResponse,
+        dependencies=[
+            Depends(
+                require_permission(
+                    permission,
+                    "hqa",
+                )
+            )
+        ],
+        name=(f"get_{marketplace}_daily_report"),
     )
     router.add_api_route(
         f"/{marketplace}/listings/export",

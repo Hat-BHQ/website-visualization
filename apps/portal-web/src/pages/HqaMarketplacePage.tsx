@@ -21,7 +21,9 @@ import { PageHeader } from '@/components/PageHeader';
 import { ModuleLayout } from '@/layouts/ModuleLayout';
 import type { CurrentUser } from '@/types/auth';
 import type { ListingListParams, Marketplace } from '@/types/hqa';
-
+import {
+  MarketplaceTabs,
+} from '@/components/MarketplaceTabs';
 const defaultFilters: ListingListParams = {
   page: 1,
   page_size: 20,
@@ -139,7 +141,7 @@ export function HqaMarketplacePage({
   return (
     <ModuleLayout moduleCode="HQA" user={user} title={`${title} Listings`} subtitle="Danh sách và lịch sử biến động listing">
       <PageHeader title={`${title} Listings`} subtitle="Kết nối dữ liệu thật từ HQA Service" />
-
+      <MarketplaceTabs marketplace={marketplace} />
       <section className="surface" style={{ padding: '1rem', borderRadius: '18px', marginBottom: '1rem' }}>
         <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
           <label className="field-stack">

@@ -15,6 +15,8 @@ import type {
   GoogleSheetsExportResponse,
   ListingExportRequest,
   ListingExportResult,
+  DailyReportParams,
+  DailyReportResponse,
 } from '@/types/hqa';
 
 /**
@@ -86,6 +88,38 @@ function getDownloadFilename(
     );
 
   return normalMatch?.[1] ?? null;
+}
+
+export async function getMarketplaceDailyReport(
+  marketplace: Marketplace,
+  params: DailyReportParams,
+) {
+  const searchParams = new URLSearchParams();
+
+  if (params.date) {
+    searchParams.set('date', params.date);
+  }
+
+  appendMany(searchParams, 'status', params.status);
+  searchParams.set('table', params.table);
+  searchParams.set('sort', params.sort);
+  searchParams.set('page', String(params.page));
+  searchParams.set('page_size', String(params.page_size));
+
+  const endpoint = withQueryString(
+    `/api/hqa/${marketplace}/daily-report`,
+    searchParams.toString(),
+  );
+
+  const response =
+    await apiClient.get<DailyReportResponse>(
+      endpoint,
+      {
+        baseURL: hqaBaseUrl,
+      },
+    );
+
+  return response.data;
 }
 
 /**

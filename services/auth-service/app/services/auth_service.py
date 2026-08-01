@@ -36,7 +36,7 @@ from app.schemas.auth import MeResponse, ModuleAccess, TokenPair
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(timezone.utc)
 
 
 @dataclass(slots=True)

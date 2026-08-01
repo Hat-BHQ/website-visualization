@@ -12,6 +12,7 @@ import { ModuleSelectorPage } from '@/pages/ModuleSelectorPage';
 import { ModuleDashboardPage } from '@/pages/ModuleDashboardPage';
 import { SystemPage } from '@/pages/SystemPage';
 import { useAuth } from '@/auth/useAuth';
+import { HqaDailyReportPage, } from '@/pages/HqaDailyReportPage';
 
 function HomeRedirect() {
   const auth = useAuth();
@@ -51,6 +52,31 @@ function HqsRoute() {
   return <ModuleDashboardPage moduleCode="HQS" user={auth.user} title="HQS Dashboard" subtitle="Service operations overview." />;
 }
 
+function HqaDailyReportRoute({
+  marketplace,
+  title,
+}: {
+  marketplace:
+  | 'ebay'
+  | 'reverb'
+  | 'etsy';
+  title: string;
+}) {
+  const auth = useAuth();
+
+  if (!auth.user) {
+    return null;
+  }
+
+  return (
+    <HqaDailyReportPage
+      user={auth.user}
+      marketplace={marketplace}
+      title={title}
+    />
+  );
+}
+
 function SystemRoute() {
   const auth = useAuth();
   if (!auth.user) return null;
@@ -70,6 +96,47 @@ export function AppRouter() {
       <Route path="/hqs/dashboard" element={<AuthGuard><ModuleGuard moduleCode="HQS"><HqsRoute /></ModuleGuard></AuthGuard>} />
       <Route path="/system" element={<AuthGuard><SuperadminGuard><SystemRoute /></SuperadminGuard></AuthGuard>} />
       <Route path="/403" element={<ForbiddenPage />} />
+      <Route
+        path="/hqa/ebay/daily-report"
+        element={
+          <AuthGuard>
+            <ModuleGuard moduleCode="HQA">
+              <HqaDailyReportRoute
+                marketplace="ebay"
+                title="eBay"
+              />
+            </ModuleGuard>
+          </AuthGuard>
+        }
+      />
+
+      <Route
+        path="/hqa/reverb/daily-report"
+        element={
+          <AuthGuard>
+            <ModuleGuard moduleCode="HQA">
+              <HqaDailyReportRoute
+                marketplace="reverb"
+                title="Reverb"
+              />
+            </ModuleGuard>
+          </AuthGuard>
+        }
+      />
+
+      <Route
+        path="/hqa/etsy/daily-report"
+        element={
+          <AuthGuard>
+            <ModuleGuard moduleCode="HQA">
+              <HqaDailyReportRoute
+                marketplace="etsy"
+                title="Etsy"
+              />
+            </ModuleGuard>
+          </AuthGuard>
+        }
+      />
       <Route path="*" element={<Navigate replace to="/" />} />
     </Routes>
   );
