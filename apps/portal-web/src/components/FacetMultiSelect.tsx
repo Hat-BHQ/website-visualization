@@ -26,8 +26,12 @@ export function FacetMultiSelect({
     placeholder = 'Tất cả',
     onApply,
 }: FacetMultiSelectProps) {
-    const detailsRef =
-        useRef<HTMLDetailsElement | null>(null);
+    // Bọc toàn bộ dropdown để phát hiện click ra ngoài.
+    const rootRef = useRef<HTMLDivElement | null>(null);
+
+    // Trạng thái đóng/mở giờ do React quản lý (controlled),
+    // thay cho thuộc tính open mặc định của thẻ <details>.
+    const [open, setOpen] = useState(false);
 
     const [draft, setDraft] =
         useState<string[]>(value);
@@ -38,6 +42,59 @@ export function FacetMultiSelect({
     useEffect(() => {
         setDraft(value);
     }, [value]);
+
+    // Đóng menu khi click ra ngoài (bao gồm click sang select khác)
+    // hoặc khi nhấn Escape. Chỉ gắn listener khi menu đang mở.
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        const closeAndReset = () => {
+            setDraft(value);
+            setSearch('');
+            setOpen(false);
+        };
+
+        const handlePointerDown = (event: PointerEvent) => {
+            if (
+                rootRef.current &&
+                !rootRef.current.contains(
+                    event.target as Node,
+                )
+            ) {
+                closeAndReset();
+            }
+        };
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                closeAndReset();
+            }
+        };
+
+        document.addEventListener(
+            'pointerdown',
+            handlePointerDown,
+        );
+
+        document.addEventListener(
+            'keydown',
+            handleKeyDown,
+        );
+
+        return () => {
+            document.removeEventListener(
+                'pointerdown',
+                handlePointerDown,
+            );
+
+            document.removeEventListener(
+                'keydown',
+                handleKeyDown,
+            );
+        };
+    }, [open, value]);
 
     const filteredOptions = useMemo(() => {
         const keyword = search.trim().toLowerCase();
@@ -72,22 +129,16 @@ export function FacetMultiSelect({
         );
     };
 
-    const closeMenu = () => {
-        if (detailsRef.current) {
-            detailsRef.current.open = false;
-        }
-    };
-
     const handleCancel = () => {
         setDraft(value);
         setSearch('');
-        closeMenu();
+        setOpen(false);
     };
 
     const handleApply = () => {
         onApply(draft);
         setSearch('');
-        closeMenu();
+        setOpen(false);
     };
 
     const selectVisible = () => {
@@ -105,101 +156,111 @@ export function FacetMultiSelect({
     };
 
     return (
-        <label className="field-stack">
+        <div
+            className="field-stack"
+            ref={rootRef}
+        >
             <span className="field-label">
                 {label}
             </span>
 
-            <details
-                ref={detailsRef}
-                className="facet-select"
-            >
-                <summary className="facet-select__summary">
+            <div className="facet-select">
+                <button
+                    type="button"
+                    className="facet-select__summary"
+                    aria-haspopup="listbox"
+                    aria-expanded={open}
+                    onClick={() =>
+                        setOpen((current) => !current)
+                    }
+                >
                     <span>{selectedText}</span>
                     <span>▾</span>
-                </summary>
+                </button>
 
-                <div className="facet-select__menu">
-                    <div className="facet-select__actions">
-                        <button
-                            type="button"
-                            onClick={selectVisible}
-                        >
-                            Chọn tất cả
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => setDraft([])}
-                        >
-                            Xóa
-                        </button>
-                    </div>
-
-                    {searchable ? (
-                        <input
-                            type="search"
-                            value={search}
-                            onChange={(event) =>
-                                setSearch(event.target.value)
-                            }
-                            placeholder="Tìm kiếm..."
-                        />
-                    ) : null}
-
-                    <div className="facet-select__options">
-                        {filteredOptions.map((option) => (
-                            <label
-                                key={option.value}
-                                className="facet-select__option"
+                {open ? (
+                    <div className="facet-select__menu">
+                        <div className="facet-select__actions">
+                            <button
+                                type="button"
+                                onClick={selectVisible}
                             >
-                                <input
-                                    type="checkbox"
-                                    checked={draft.includes(
-                                        option.value,
-                                    )}
-                                    onChange={() =>
-                                        toggleValue(option.value)
-                                    }
-                                />
+                                Chọn tất cả
+                            </button>
 
-                                <span className="facet-select__label">
-                                    {option.label}
-                                </span>
+                            <button
+                                type="button"
+                                onClick={() => setDraft([])}
+                            >
+                                Xóa
+                            </button>
+                        </div>
 
-                                <span className="facet-select__count">
-                                    {option.count.toLocaleString(
-                                        'vi-VN',
-                                    )}
-                                </span>
-                            </label>
-                        ))}
-
-                        {filteredOptions.length === 0 ? (
-                            <div className="facet-select__empty">
-                                Không tìm thấy giá trị
-                            </div>
+                        {searchable ? (
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
+                                placeholder="Tìm kiếm..."
+                            />
                         ) : null}
-                    </div>
 
-                    <div className="facet-select__footer">
-                        <button
-                            type="button"
-                            onClick={handleCancel}
-                        >
-                            Hủy
-                        </button>
+                        <div className="facet-select__options">
+                            {filteredOptions.map((option) => (
+                                <label
+                                    key={option.value}
+                                    className="facet-select__option"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={draft.includes(
+                                            option.value,
+                                        )}
+                                        onChange={() =>
+                                            toggleValue(option.value)
+                                        }
+                                    />
 
-                        <button
-                            className="facet-select__ok"
-                            type="button"
-                            onClick={handleApply}
-                        >
-                            OK
-                        </button>
+                                    <span className="facet-select__label">
+                                        {option.label}
+                                    </span>
+
+                                    <span className="facet-select__count">
+                                        {option.count.toLocaleString(
+                                            'vi-VN',
+                                        )}
+                                    </span>
+                                </label>
+                            ))}
+
+                            {filteredOptions.length === 0 ? (
+                                <div className="facet-select__empty">
+                                    Không tìm thấy giá trị
+                                </div>
+                            ) : null}
+                        </div>
+
+                        <div className="facet-select__footer">
+                            <button
+                                type="button"
+                                onClick={handleCancel}
+                            >
+                                Hủy
+                            </button>
+
+                            <button
+                                className="facet-select__ok"
+                                type="button"
+                                onClick={handleApply}
+                            >
+                                OK
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </details>
-        </label>
+                ) : null}
+            </div>
+        </div>
     );
 }

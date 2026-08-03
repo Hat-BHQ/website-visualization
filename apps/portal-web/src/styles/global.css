@@ -470,6 +470,7 @@ button:disabled {
   justify-content: space-between;
   cursor: pointer;
   list-style: none;
+  width: 100%;
 }
 
 .facet-select__summary::-webkit-details-marker {
